@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.accessverify import access_verify_service
 from app.store import store
 
 MODULE = "parserule"
@@ -10,6 +11,9 @@ REQUIRED_FIELDS = ["规则编号", "页面选择器", "内容选择器"]
 STATUS_ORDER = ["草稿", "规则验证中", "已启用", "已废弃"]
 ACTION_RULES = {"提交规则验证": "规则验证中", "启用规则": "已启用", "废弃规则": "已废弃"}
 NEGATIVE_ACTIONS = []
+
+# 规则从「已启用」离开（重新验证或废弃）后，关联任务调度入口需要同步不可用。
+LEAVING_ENABLED_STATUSES = ("规则验证中", "已废弃")
 
 
 class ParseruleService:
@@ -28,10 +32,11 @@ class ParseruleService:
             rows = [row for row in rows if row.get("status") == status]
         total = len(rows)
         start = max(page - 1, 0) * size
-        return rows[start:start + size], total
+        return [dict(row) for row in rows[start:start + size]], total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        entry = store.find(MODULE, entry_id)
+        return dict(entry) if entry else None
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]
@@ -43,8 +48,10 @@ class ParseruleService:
         entry["status"] = STATUS_ORDER[0]
         entry["pending"] = True
         entry["abnormal"] = False
+        # 规则版本从 v1 起；重新验证/废弃后版本递增，任务侧据此感知规则失效。
+        entry["规则版本"] = 1
         rows.append(entry)
-        return entry, []
+        return dict(entry), []
 
     def run_action(self, entry_id: int, action: str) -> tuple[dict[str, Any] | None, str]:
         entry = store.find(MODULE, entry_id)
@@ -55,7 +62,17 @@ class ParseruleService:
         target = ACTION_RULES[action]
         if target not in STATUS_ORDER:
             return None, f"目标状态「{target}」不在允许的状态序列里"
+        previous_status = str(entry.get("status") or "")
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
-        return entry, f"解析规则已{action}"
+        # 已启用 -> 验证中/已废弃：版本递增，关联采集任务调度入口同步反映不可用原因。
+        version = access_verify_service.bump_rule_version_if_needed(entry, previous_status)
+        if previous_status == "已启用" and target in LEAVING_ENABLED_STATUSES:
+            message = (
+                f"解析规则已{action}，规则版本递增至 v{version}；"
+                "关联采集任务的调度入口已同步标记为不可用"
+            )
+        else:
+            message = f"解析规则已{action}"
+        return dict(entry), message

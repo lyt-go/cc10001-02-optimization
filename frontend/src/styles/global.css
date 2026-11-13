@@ -33,3 +33,16 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .link { border: none; background: none; color: var(--brand); cursor: pointer; padding: 0; }
 .page-foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .error-text { color: #b42318; }
+.ok-text { color: #067647; }
+/* 接入验证状态标签：采集源详情与采集任务清单共用同一口径 */
+.state-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; white-space: nowrap; }
+.state-tag.valid { background: #e7f6ec; color: #067647; border: 1px solid #aee3c0; }
+.state-tag.stale { background: #fef3f2; color: #b42318; border: 1px solid #f5c6c2; }
+.state-tag.blocked { background: #fff4e5; color: #b54708; border: 1px solid #f7d9ae; }
+.reason-cell { max-width: 260px; color: #b54708; font-size: 12px; }
+/* 历史验证记录弹窗 */
+.modal-mask { position: fixed; inset: 0; background: rgba(16, 24, 40, 0.45); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-card { background: #fff; border-radius: 10px; width: min(920px, 92vw); max-height: 84vh; overflow: auto; padding: 18px 20px; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.modal-title { margin: 0; font-size: 16px; }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }

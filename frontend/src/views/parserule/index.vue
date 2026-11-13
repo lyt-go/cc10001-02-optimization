@@ -70,7 +70,7 @@ import { request } from '@/api/client'
 type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/parserule'
-const columns = ["规则编号", "页面选择器", "内容选择器", "属性提取器", "列表容错", "空值占位符", "字符清洗正则", "输出字段映射"]
+const columns = ["规则编号", "规则版本", "页面选择器", "内容选择器", "属性提取器", "列表容错", "空值占位符", "字符清洗正则", "输出字段映射"]
 const actions = ["提交规则验证", "启用规则", "废弃规则"]
 const statuses = ["草稿", "规则验证中", "已启用", "已废弃"]
 const stats = [{"label": "解析规则总数", "value": 0}, {"label": "已启用规则", "value": 0}, {"label": "验证中规则", "value": 0}]
@@ -99,7 +99,7 @@ async function runAction(action: string, row: Row) {
   try {
     const response = await request(`${ENDPOINT}/${row.id}/actions`, {
       method: 'POST',
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ values: { action } }),
     })
     if (!response.ok) {
       throw new Error('解析规则动作未生效，请稍后重试')

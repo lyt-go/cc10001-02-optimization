@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas import ActionResult, EntryPayload, PageResult
+from app.services.accessverify import access_verify_service
 from app.services.datasource import DatasourceService
 
 router = APIRouter(prefix="/api/datasource", tags=["采集源登记"])
@@ -48,6 +49,15 @@ def create_entry(payload: EntryPayload) -> ActionResult:
     return ActionResult(ok=True, message="采集源已登记", entry=entry)
 
 
+@router.put("/{entry_id}", response_model=ActionResult)
+def update_entry(entry_id: int, payload: EntryPayload) -> ActionResult:
+    """更新采集源持久化配置；入口URL/请求方式等指纹项变化后旧连通结论立即失效。"""
+    entry, message = service.update_config(entry_id, payload.values)
+    if entry is None:
+        return ActionResult(ok=False, message=message)
+    return ActionResult(ok=True, message=message, entry=entry)
+
+
 @router.post("/{entry_id}/actions", response_model=ActionResult)
 def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     """对单条采集源执行发起连通测试、标记上线、归档源配置；不允许的动作会被拦下并说明原因。"""
@@ -56,6 +66,16 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
+
+
+@router.get("/{entry_id}/verifications", response_model=dict)
+def verification_history(entry_id: int) -> dict[str, Any]:
+    """读取采集源的历史验证记录：全部保留，按当时的有效期标注有效/已失效。"""
+    entry = service.get_entry(entry_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"采集源 {entry_id} 不存在或已归档")
+    items = access_verify_service.history_for(entry_id)
+    return {"module": "accessverify", "源端编号": entry.get("源端编号"), "total": len(items), "items": items}
 
 
 @router.get("/export")
